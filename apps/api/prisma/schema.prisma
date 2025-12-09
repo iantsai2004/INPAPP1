@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id              String           @id @default(cuid())
+  name            String
+  avatar          String?
+  createdAt       DateTime         @default(now())
+  videos          Video[]
+  comments        Comment[]
+  favorites       Favorite[]
+  progressEntries ProgressEntry[]
+  groupMembers    GroupMember[]
+}
+
+model Video {
+  id            String            @id @default(cuid())
+  title         String
+  description   String?
+  playbackUrl   String
+  thumbnail     String
+  durationSec   Int?
+  tags          Json              @default("[]")
+  views         Int               @default(0)
+  likes         Int               @default(0)
+  commentsCount Int               @default(0)
+  createdAt     DateTime          @default(now())
+  authorId      String?
+  author        User?             @relation(fields: [authorId], references: [id])
+  comments      Comment[]
+  requirements  GroupRequirement[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Group {
+  id             String             @id @default(cuid())
+  title          String
+  goal           String?
+  memberCount    Int                @default(0)
+  progress       Int                @default(0) // 0-100
+  createdAt      DateTime           @default(now())
+  requirements   GroupRequirement[]
+  milestones     Milestone[]
+  members        GroupMember[]
+}
+
+model GroupRequirement {
+  id       Int    @id @default(autoincrement())
+  groupId  String
+  videoId  String
+  group    Group  @relation(fields: [groupId], references: [id])
+  video    Video  @relation(fields: [videoId], references: [id])
+
+  @@unique([groupId, videoId])
+}
+
+model Milestone {
+  id              Int              @id @default(autoincrement())
+  title           String
+  targetDate      DateTime?
+  status          String?          // planned | in_progress | done
+  groupId         String
+  group           Group            @relation(fields: [groupId], references: [id])
+  progressEntries ProgressEntry[]
+}
+
+model ProgressEntry {
+  id          Int       @id @default(autoincrement())
+  note        String?
+  createdAt   DateTime  @default(now())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+  milestoneId Int
+  milestone   Milestone @relation(fields: [milestoneId], references: [id])
+}
+
+model Favorite {
+  id         Int      @id @default(autoincrement())
+  userId     String
+  targetId   String
+  targetType String   // video | group
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, targetId, targetType])
+}
+
+model GroupMember {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  groupId   String
+  status    String   @default("joined") // joined | pending
+  createdAt DateTime @default(now())
+
+  user   User  @relation(fields: [userId], references: [id])
+  group  Group @relation(fields: [groupId], references: [id])
+
+  @@unique([userId, groupId])
+}
