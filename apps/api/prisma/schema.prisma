@@ -4,18 +4,25 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model User {
   id              String           @id @default(cuid())
   name            String
   avatar          String?
+  bio             String?
+  email           String?          @unique
+  password        String?
   createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   videos          Video[]
   comments        Comment[]
   favorites       Favorite[]
   progressEntries ProgressEntry[]
   groupMembers    GroupMember[]
+  watchHistory    WatchHistory[]
+  commentLikes    CommentLike[]
 }
 
 model Video {
@@ -25,35 +32,45 @@ model Video {
   playbackUrl   String
   thumbnail     String
   durationSec   Int?
-  tags          Json              @default("[]")
+  tags          String            @default("[]")
   views         Int               @default(0)
   likes         Int               @default(0)
   commentsCount Int               @default(0)
   createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   authorId      String?
-  author        User?             @relation(fields: [authorId], references: [id])
+  author        User?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
   comments      Comment[]
   requirements  GroupRequirement[]
+  watchHistory  WatchHistory[]
 }
 
 model Comment {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   body      String
-  likes     Int      @default(0)
-  createdAt DateTime @default(now())
+  likes     Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
   videoId   String
-  video     Video    @relation(fields: [videoId], references: [id])
+  video     Video       @relation(fields: [videoId], references: [id], onDelete: Cascade)
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  parentId  String?
+  parent    Comment?    @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[]   @relation("CommentReplies")
+  likedBy   CommentLike[] @relation("commentLikes")
 }
 
 model Group {
   id             String             @id @default(cuid())
   title          String
+  description    String?
   goal           String?
   memberCount    Int                @default(0)
   progress       Int                @default(0) // 0-100
+  image          String?
   createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   requirements   GroupRequirement[]
   milestones     Milestone[]
   members        GroupMember[]
@@ -63,19 +80,34 @@ model GroupRequirement {
   id       Int    @id @default(autoincrement())
   groupId  String
   videoId  String
-  group    Group  @relation(fields: [groupId], references: [id])
-  video    Video  @relation(fields: [videoId], references: [id])
+  group    Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  video    Video  @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, videoId])
+}
+
+model GroupMember {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  groupId   String
+  status    String   @default("pending") // pending | joined | left
+  joinedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
 }
 
 model Milestone {
   id              Int              @id @default(autoincrement())
   title           String
+  description     String?
   targetDate      DateTime?
-  status          String?          // planned | in_progress | done
+  status          String?          @default("planned") // planned | in_progress | done
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   groupId         String
-  group           Group            @relation(fields: [groupId], references: [id])
+  group           Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
   progressEntries ProgressEntry[]
 }
 
@@ -84,9 +116,9 @@ model ProgressEntry {
   note        String?
   createdAt   DateTime  @default(now())
   userId      String?
-  user        User?     @relation(fields: [userId], references: [id])
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   milestoneId Int
-  milestone   Milestone @relation(fields: [milestoneId], references: [id])
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
 }
 
 model Favorite {
@@ -95,20 +127,29 @@ model Favorite {
   targetId   String
   targetType String   // video | group
   createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, targetId, targetType])
 }
 
-model GroupMember {
+model CommentLike {
   id        Int      @id @default(autoincrement())
   userId    String
-  groupId   String
-  status    String   @default("joined") // joined | pending
+  commentId String
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment  @relation("commentLikes", fields: [commentId], references: [id], onDelete: Cascade)
 
-  user   User  @relation(fields: [userId], references: [id])
-  group  Group @relation(fields: [groupId], references: [id])
+  @@unique([userId, commentId])
+}
 
-  @@unique([userId, groupId])
+model WatchHistory {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  videoId   String
+  watchedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
 }

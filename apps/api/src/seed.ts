@@ -128,7 +128,7 @@ const seedGroups: SeedGroup[] = [
   },
 ];
 
-export async function seedDatabase(prisma: PrismaClient) {
+export async function seedDatabase(prisma: any) {
   const hasVideos = await prisma.video.count();
   if (hasVideos > 0) return;
 
@@ -139,7 +139,7 @@ export async function seedDatabase(prisma: PrismaClient) {
       await tx.video.create({
         data: {
           ...video,
-          tags: video.tags as unknown as Prisma.JsonArray,
+          tags: JSON.stringify(video.tags),
         },
       });
     }

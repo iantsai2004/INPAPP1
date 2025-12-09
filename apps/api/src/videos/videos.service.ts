@@ -1,29 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Comment, Group, GroupRequirement, Milestone, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { seedDatabase } from '../seed';
 
-type VideoWithRelations = Prisma.VideoGetPayload<{
-  include: {
-    comments: { include: { user: true } };
-    author: true;
-    requirements: {
-      include: {
-        group: {
-          include: {
-            milestones: true;
-            requirements: true;
-          };
-        };
-      };
-    };
-  };
-}>;
-
-type GroupWithRequirements = Group & {
-  requirements: GroupRequirement[];
-  milestones: Milestone[];
-};
+// Simplified types for SQLite
+type VideoWithRelations = any;
+type GroupWithRequirements = any;
 
 @Injectable()
 export class VideosService {
@@ -155,7 +137,7 @@ export class VideosService {
         playbackUrl: data.playbackUrl,
         thumbnail: data.thumbnail,
         durationSec: data.durationSec,
-        tags: data.tags ?? [],
+        tags: JSON.stringify(data.tags ?? []),
         authorId: data.authorId,
       },
       include: { author: true, comments: true, requirements: true },
@@ -209,15 +191,18 @@ export class VideosService {
     };
   }
 
-  private parseTags(tags: string | null): string[] {
+  private parseTags(tags: any): string[] {
     if (!tags) return [];
     if (Array.isArray(tags)) return tags as string[];
-    try {
-      const parsed = JSON.parse(tags);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      return [];
+    if (typeof tags === 'string') {
+      try {
+        const parsed = JSON.parse(tags);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
     }
+    return [];
   }
 }
 
